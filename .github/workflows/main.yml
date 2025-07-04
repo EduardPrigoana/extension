@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -27,44 +27,89 @@ jobs:
           npm install -g pnpm
           pnpm install
 
-      - name: Rebuild sharp for macOS runner
+      - name: Rebuild sharp for macOS
         run: |
           npm rebuild sharp --verbose || true
 
       - name: Build Plasmo extension for Safari (MV3) with zip
         run: pnpm build --target=safari-mv3 --zip
 
-      - name: Convert extension to Safari App Extension Xcode project
-        run: |
-          xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
+      - name: Create safari directory for Xcode project
+        run: mkdir safari
 
-      - name: Show generated Xcode project files
+      - name: Convert to Safari App Extension Xcode project
+        run: |
+          xcrun safari-web-extension-converter ./build/safari-mv3-prod \
+            --project-location ./safari \
+            --no-open \
+            --force
+
+      - name: Show generated files
         run: ls -R safari
+
+      - name: Get Xcode project and scheme name
+        id: get_xcode_info
+        run: |
+          cd safari
+          PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
+          echo "Found Xcode project: $PROJECT"
+          SCHEME=$(xcodebuild -list -project "$PROJECT" | awk '/Schemes:/ {getline; print $1}')
+          echo "Detected scheme: $SCHEME"
+          echo "project_path=$PROJECT" >> $GITHUB_OUTPUT
+          echo "scheme_name=$SCHEME" >> $GITHUB_OUTPUT
 
       - name: Build unsigned .ipa
         run: |
-          cd safari/"P-Stream Extension"
+          cd safari
+          PROJECT="${{ steps.get_xcode_info.outputs.project_path }}"
+          SCHEME="${{ steps.get_xcode_info.outputs.scheme_name }}"
 
+          echo "Building project: $PROJECT"
+          echo "Using scheme: $SCHEME"
+
+          mkdir -p build
+
+          # Archive
           xcodebuild \
-            -scheme "P-Stream Extension" \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
-            -archivePath ../build/PStreamExtension.xcarchive archive
+            -archivePath build/Extension.xcarchive archive
 
+          # Create a minimal exportOptions.plist for ad-hoc unsigned export
+          cat <<EOF > build/exportOptions.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>development</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+  <key>compileBitcode</key>
+  <false/>
+  <key>stripSwiftSymbols</key>
+  <true/>
+</dict>
+</plist>
+EOF
+
+          # Export IPA (unsigned)
           xcodebuild \
             -exportArchive \
-            -archivePath ../build/PStreamExtension.xcarchive \
-            -exportPath ../build/ipa \
-            -exportOptionsPlist ../build/exportOptions.plist || true
+            -archivePath build/Extension.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist build/exportOptions.plist || true
 
-      - name: Upload IPA artifact
+      - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: safari-extension-unsigned-ipa
           path: safari/build/ipa/*.ipa
 
-      - name: Upload Plasmo zip artifact
+      - name: Upload Plasmo Safari zip
         uses: actions/upload-artifact@v4
         with:
           name: plasmo-safari-zip
-          path: build/safari-mv3-prod.zip
+          path: build/safari-mv3-prod.
