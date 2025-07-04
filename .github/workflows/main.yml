@@ -20,9 +20,12 @@ jobs:
           node-version: 20
 
       - name: Install dependencies with pnpm
+        env:
+          npm_config_platform: darwin
+          npm_config_arch: x64
         run: |
           npm install -g pnpm
-          pnpm install
+          pnpm instal
 
       - name: Build Plasmo extension for Safari (MV3) with zip
         run: pnpm build --target=safari-mv3 --zip
