@@ -53,17 +53,18 @@ jobs:
           
       - name: Build unsigned .ipa
         run: |
-          cd safari/pstream || cd safari
-          xcodebuild archive \
-            -scheme "$SCHEME" \
+          cd "safari/P-Stream extension"
+          xcodebuild \
+            -scheme "P-Stream extension (iOS)" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
-            -archivePath ../build/$SCHEME.xcarchive
+            -archivePath ../../build/PStreamExtension.xcarchive archive
 
-          xcodebuild -exportArchive \
-            -archivePath ../build/$SCHEME.xcarchive \
-            -exportPath ../build/ipa \
-            -exportOptionsPlist ../build/exportOptions.plist || true
+          xcodebuild \
+            -exportArchive \
+            -archivePath ../../build/PStreamExtension.xcarchive \
+            -exportPath ../../build/ipa \
+            -exportOptionsPlist ../../build/exportOptions.plist || true
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
