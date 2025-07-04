@@ -46,8 +46,7 @@ jobs:
 
       - name: Build unsigned .ipa
         run: |
-          # Replace <YourXcodeProjectName> with actual name!
-          cd safari/<YourXcodeProjectName>
+          cd safari/pstream
 
           xcodebuild \
             -scheme "<YourXcodeProjectName>" \
