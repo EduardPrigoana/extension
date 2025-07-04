@@ -58,7 +58,11 @@ jobs:
             -scheme "P-Stream extension (iOS)" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
-            -archivePath ../../build/PStreamExtension.xcarchive archive
+            -archivePath ../../build/PStreamExtension.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            archive
 
           xcodebuild \
             -exportArchive \
