@@ -34,9 +34,6 @@ jobs:
       - name: Build Plasmo extension for Safari (MV3) with zip
         run: pnpm build --target=safari-mv3 --zip
 
-      - name: Create safari directory for Xcode project
-        run: mkdir safari
-
       - name: Convert extension to Safari App Extension Xcode project
         run: |
           xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
@@ -46,17 +43,17 @@ jobs:
 
       - name: Build unsigned .ipa
         run: |
-          cd safari/pstream
+          cd safari/"P-Stream Extension"
 
           xcodebuild \
-            -scheme "<YourXcodeProjectName>" \
+            -scheme "P-Stream Extension" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
-            -archivePath ../build/YourExtension.xcarchive archive
+            -archivePath ../build/PStreamExtension.xcarchive archive
 
           xcodebuild \
             -exportArchive \
-            -archivePath ../build/YourExtension.xcarchive \
+            -archivePath ../build/PStreamExtension.xcarchive \
             -exportPath ../build/ipa \
             -exportOptionsPlist ../build/exportOptions.plist || true
 
