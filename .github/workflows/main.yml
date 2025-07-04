@@ -1,9 +1,8 @@
 name: Build Safari Extension (Unsigned IPA)
 
 on:
-  push:
-    branches:
-      - main
+ workflow_dispatch:
+
 
 jobs:
   build:
