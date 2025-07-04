@@ -1,53 +1,69 @@
 name: Build Safari Extension (Unsigned IPA)
 
 on:
- workflow_dispatch:
-
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest  # MUST be macOS for Xcode
+    runs-on: macos-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Plasmo extension
-        run: npm run build
-
-      - name: Convert to Safari App Extension
+      - name: Install dependencies with pnpm
         run: |
-          mkdir safari
-          xcrun safari-web-extension-converter ./build --project-location ./safari --no-open --force
+          npm install -g pnpm
+          pnpm install
 
-      - name: Show generated Xcode project
+      - name: Build Plasmo extension for Safari (MV3) with zip
+        run: pnpm build --target=safari-mv3 --zip
+
+      - name: Create safari directory for Xcode project
+        run: mkdir safari
+
+      - name: Convert extension to Safari App Extension Xcode project
+        run: |
+          xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
+
+      - name: Show generated Xcode project files
         run: ls -R safari
 
       - name: Build unsigned .ipa
         run: |
-          cd safari/<YourExtensionName>
+          # Change to your actual Xcode project directory name here:
+          cd safari/<YourXcodeProjectName>
+          
+          # Archive the project (generic iOS device)
           xcodebuild \
-            -scheme "<YourExtensionName>" \
+            -scheme "<YourXcodeProjectName>" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
             -archivePath ../build/YourExtension.xcarchive archive
 
+          # Export unsigned IPA using exportOptions.plist
           xcodebuild \
             -exportArchive \
             -archivePath ../build/YourExtension.xcarchive \
             -exportPath ../build/ipa \
             -exportOptionsPlist ../build/exportOptions.plist || true
 
-      - name: Upload .ipa as artifact
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: safari-extension-unsigned
-          path: safari/build/ipa
+          name: safari-extension-unsigned-ipa
+          path: safari/build/ipa/*.ipa
+
+      - name: Upload Plasmo zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasmo-safari-zip
+          path: build/safari-mv3-prod.zip
