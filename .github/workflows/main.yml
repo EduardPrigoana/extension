@@ -37,13 +37,14 @@ jobs:
         run: |
           xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
 
+      - name: List files in safari directory
+        run: ls -la safari
+
       - name: List Xcode schemes
         id: list_schemes
         run: |
-          xcodebuild -list -project ./safari/*.xcodeproj > scheme_list.txt
-          echo "Schemes:"
+          xcodebuild -list -project "safari/P-Stream extension.xcodeproj" > scheme_list.txt
           cat scheme_list.txt
-          # Extract the first scheme name from the list for use in build step
           scheme=$(sed -n '/Schemes:/,$p' scheme_list.txt | sed '1d' | head -n1 | tr -d '[:space:]')
           echo "SCHEME=$scheme" >> $GITHUB_ENV
 
