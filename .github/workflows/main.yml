@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -19,15 +19,18 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install pnpm and dependencies
+      - name: Install dependencies with pnpm
+        env:
+          npm_config_platform: darwin
+          npm_config_arch: x64
         run: |
           npm install -g pnpm
           pnpm install
 
-      - name: Rebuild sharp for macOS runner (optional fallback)
+      - name: Rebuild sharp for macOS runner
         run: npm rebuild sharp --verbose || true
 
-      - name: Build Plasmo extension for Safari MV3 with zip
+      - name: Build Plasmo extension for Safari (MV3) with zip
         run: pnpm build --target=safari-mv3 --zip
 
       - name: Create safari directory for Xcode project
@@ -35,23 +38,37 @@ jobs:
 
       - name: Convert extension to Safari App Extension Xcode project
         run: |
-          xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
+          xcrun safari-web-extension-converter ./build/safari-mv3-prod \
+            --project-location ./safari \
+            --no-open \
+            --force
 
-      - name: List files in safari directory
-        run: ls -la safari
-
-      - name: List files in P-Stream extension directory
-        run: ls -la "safari/P-Stream extension"
+      - name: Show generated Xcode project structure
+        run: ls -R safari
 
       - name: List Xcode schemes
-        id: list_schemes
         run: |
-          xcodebuild -list -project "safari/P-Stream extension/P-Stream extension.xcodeproj" > scheme_list.txt
-          cat scheme_list.txt
-          scheme=$(sed -n '/Schemes:/,$p' scheme_list.txt | sed '1d' | head -n1 | tr -d '[:space:]')
-          echo "SCHEME=$scheme" >> $GITHUB_ENV
-          
-      - name: Build unsigned .ipa
+          xcodebuild -list -project "safari/P-Stream extension/P-Stream extension.xcodeproj"
+
+      - name: Write ExportOptions.plist
+        run: |
+          mkdir -p build
+          cat > build/ExportOptions.plist <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>development</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+  <key>compileBitcode</key>
+  <false/>
+</dict>
+</plist>
+EOF
+
+      - name: Build unsigned .xcarchive
         run: |
           cd "safari/P-Stream extension"
           xcodebuild \
@@ -64,17 +81,26 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             archive
 
+      - name: Export unsigned .ipa
+        run: |
+          cd "safari/P-Stream extension"
           xcodebuild \
             -exportArchive \
             -archivePath ../../build/PStreamExtension.xcarchive \
             -exportPath ../../build/ipa \
-            -exportOptionsPlist ../../build/exportOptions.plist || true
+            -exportOptionsPlist ../../build/ExportOptions.plist \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
 
-      - name: Upload IPA artifact
+      - name: Show exported IPA contents
+        run: ls -R build/ipa
+
+      - name: Upload unsigned IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: safari-extension-unsigned-ipa
-          path: safari/build/ipa/*.ipa
+          path: build/ipa/*.ipa
 
       - name: Upload Plasmo zip artifact
         uses: actions/upload-artifact@v4
