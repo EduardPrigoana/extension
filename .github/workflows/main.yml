@@ -53,14 +53,17 @@ jobs:
           cd safari
           PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Xcode project: $PROJECT"
+
           SCHEME=$(xcodebuild -list -project "$PROJECT" | awk '/Schemes:/ {getline; print $1}')
           echo "Detected scheme: $SCHEME"
-          echo "project_path=$PROJECT" >> $GITHUB_OUTPUT
-          echo "scheme_name=$SCHEME" >> $GITHUB_OUTPUT
+
+          echo "project_path=$PROJECT" >> "$GITHUB_OUTPUT"
+          echo "scheme_name=$SCHEME" >> "$GITHUB_OUTPUT"
 
       - name: Build unsigned .ipa
         run: |
           cd safari
+
           PROJECT="${{ steps.get_xcode_info.outputs.project_path }}"
           SCHEME="${{ steps.get_xcode_info.outputs.scheme_name }}"
 
@@ -77,8 +80,8 @@ jobs:
             -configuration Debug \
             -archivePath build/Extension.xcarchive archive
 
-          # Create a minimal exportOptions.plist for ad-hoc unsigned export
-          cat <<EOF > build/exportOptions.plist
+          # Create exportOptions.plist
+          cat > build/exportOptions.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -95,7 +98,7 @@ jobs:
 </plist>
 EOF
 
-          # Export IPA (unsigned)
+          # Export unsigned IPA
           xcodebuild \
             -exportArchive \
             -archivePath build/Extension.xcarchive \
@@ -112,4 +115,4 @@ EOF
         uses: actions/upload-artifact@v4
         with:
           name: plasmo-safari-zip
-          path: build/safari-mv3-prod.
+          path: build/safari-mv3-prod.zip
