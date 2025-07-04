@@ -1,0 +1,54 @@
+name: Build Safari Extension (Unsigned IPA)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest  # MUST be macOS for Xcode
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Plasmo extension
+        run: npm run build
+
+      - name: Convert to Safari App Extension
+        run: |
+          mkdir safari
+          xcrun safari-web-extension-converter ./build --project-location ./safari --no-open --force
+
+      - name: Show generated Xcode project
+        run: ls -R safari
+
+      - name: Build unsigned .ipa
+        run: |
+          cd safari/<YourExtensionName>
+          xcodebuild \
+            -scheme "<YourExtensionName>" \
+            -destination 'generic/platform=iOS' \
+            -configuration Debug \
+            -archivePath ../build/YourExtension.xcarchive archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath ../build/YourExtension.xcarchive \
+            -exportPath ../build/ipa \
+            -exportOptionsPlist ../build/exportOptions.plist || true
+
+      - name: Upload .ipa as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-extension-unsigned
+          path: safari/build/ipa
