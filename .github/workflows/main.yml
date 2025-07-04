@@ -27,6 +27,10 @@ jobs:
           npm install -g pnpm
           pnpm install
 
+      - name: Rebuild sharp for macOS runner
+        run: |
+          npm rebuild sharp --verbose || true
+
       - name: Build Plasmo extension for Safari (MV3) with zip
         run: pnpm build --target=safari-mv3 --zip
 
@@ -42,17 +46,15 @@ jobs:
 
       - name: Build unsigned .ipa
         run: |
-          # Change to your actual Xcode project directory name here:
+          # Replace <YourXcodeProjectName> with actual name!
           cd safari/<YourXcodeProjectName>
-          
-          # Archive the project (generic iOS device)
+
           xcodebuild \
             -scheme "<YourXcodeProjectName>" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
             -archivePath ../build/YourExtension.xcarchive archive
 
-          # Export unsigned IPA using exportOptions.plist
           xcodebuild \
             -exportArchive \
             -archivePath ../build/YourExtension.xcarchive \
