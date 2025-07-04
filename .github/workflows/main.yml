@@ -63,7 +63,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            DEVELOPMENT_TEAM: ABCDE12345
+            DEVELOPMENT_TEAM=ABCDE12345 \
             archive
 
           xcodebuild \
