@@ -40,14 +40,17 @@ jobs:
       - name: List files in safari directory
         run: ls -la safari
 
+      - name: List files in P-Stream extension directory
+        run: ls -la "safari/P-Stream extension"
+
       - name: List Xcode schemes
         id: list_schemes
         run: |
-          xcodebuild -list -project "safari/P-Stream extension.xcodeproj" > scheme_list.txt
+          xcodebuild -list -project "safari/P-Stream extension/P-Stream extension.xcodeproj" > scheme_list.txt
           cat scheme_list.txt
           scheme=$(sed -n '/Schemes:/,$p' scheme_list.txt | sed '1d' | head -n1 | tr -d '[:space:]')
           echo "SCHEME=$scheme" >> $GITHUB_ENV
-
+          
       - name: Build unsigned .ipa
         run: |
           cd safari/pstream || cd safari
