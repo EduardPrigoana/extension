@@ -25,7 +25,7 @@ jobs:
           npm_config_arch: x64
         run: |
           npm install -g pnpm
-          pnpm instal
+          pnpm install
 
       - name: Build Plasmo extension for Safari (MV3) with zip
         run: pnpm build --target=safari-mv3 --zip
