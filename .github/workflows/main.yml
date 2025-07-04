@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -19,99 +19,55 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies with pnpm
-        env:
-          npm_config_platform: darwin
-          npm_config_arch: x64
+      - name: Install pnpm and dependencies
         run: |
           npm install -g pnpm
           pnpm install
 
-      - name: Rebuild sharp for macOS
-        run: |
-          npm rebuild sharp --verbose || true
+      - name: Rebuild sharp for macOS runner (optional fallback)
+        run: npm rebuild sharp --verbose || true
 
-      - name: Build Plasmo extension for Safari (MV3) with zip
+      - name: Build Plasmo extension for Safari MV3 with zip
         run: pnpm build --target=safari-mv3 --zip
 
       - name: Create safari directory for Xcode project
-        run: mkdir safari
+        run: mkdir -p safari
 
-      - name: Convert to Safari App Extension Xcode project
+      - name: Convert extension to Safari App Extension Xcode project
         run: |
-          xcrun safari-web-extension-converter ./build/safari-mv3-prod \
-            --project-location ./safari \
-            --no-open \
-            --force
+          xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
 
-      - name: Show generated files
-        run: ls -R safari
-
-      - name: Get Xcode project and scheme name
-        id: get_xcode_info
+      - name: List Xcode schemes
+        id: list_schemes
         run: |
-          cd safari
-          PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
-          echo "Found Xcode project: $PROJECT"
-
-          SCHEME=$(xcodebuild -list -project "$PROJECT" | awk '/Schemes:/ {getline; print $1}')
-          echo "Detected scheme: $SCHEME"
-
-          echo "project_path=$PROJECT" >> "$GITHUB_OUTPUT"
-          echo "scheme_name=$SCHEME" >> "$GITHUB_OUTPUT"
+          xcodebuild -list -project ./safari/*.xcodeproj > scheme_list.txt
+          echo "Schemes:"
+          cat scheme_list.txt
+          # Extract the first scheme name from the list for use in build step
+          scheme=$(sed -n '/Schemes:/,$p' scheme_list.txt | sed '1d' | head -n1 | tr -d '[:space:]')
+          echo "SCHEME=$scheme" >> $GITHUB_ENV
 
       - name: Build unsigned .ipa
         run: |
-          cd safari
-
-          PROJECT="${{ steps.get_xcode_info.outputs.project_path }}"
-          SCHEME="${{ steps.get_xcode_info.outputs.scheme_name }}"
-
-          echo "Building project: $PROJECT"
-          echo "Using scheme: $SCHEME"
-
-          mkdir -p build
-
-          # Archive
-          xcodebuild \
-            -project "$PROJECT" \
+          cd safari/pstream || cd safari
+          xcodebuild archive \
             -scheme "$SCHEME" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
-            -archivePath build/Extension.xcarchive archive
+            -archivePath ../build/$SCHEME.xcarchive
 
-          # Create exportOptions.plist
-          cat > build/exportOptions.plist <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key>
-  <string>development</string>
-  <key>signingStyle</key>
-  <string>manual</string>
-  <key>compileBitcode</key>
-  <false/>
-  <key>stripSwiftSymbols</key>
-  <true/>
-</dict>
-</plist>
-EOF
+          xcodebuild -exportArchive \
+            -archivePath ../build/$SCHEME.xcarchive \
+            -exportPath ../build/ipa \
+            -exportOptionsPlist ../build/exportOptions.plist || true
 
-          # Export unsigned IPA
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/Extension.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist build/exportOptions.plist || true
-
-      - name: Upload unsigned IPA
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: safari-extension-unsigned-ipa
           path: safari/build/ipa/*.ipa
 
-      - name: Upload Plasmo Safari zip
+      - name: Upload Plasmo zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: plasmo-safari-zip
