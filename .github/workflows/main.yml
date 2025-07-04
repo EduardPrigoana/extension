@@ -1,85 +1,71 @@
-name: Build Safari Extension (Unsigned IPA)
+name: Build unsigned iOS IPA
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  build:
+  build-unsigned:
     runs-on: macos-latest
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
         with:
-          node-version: 20
+          xcode-version: '15.4'
 
-      - name: Install dependencies with pnpm
-        env:
-          npm_config_platform: darwin
-          npm_config_arch: x64
-        run: |
-          npm install -g pnpm
-          pnpm install
+      - name: Create build directories
+        run: mkdir -p build/ipa
 
-      - name: Rebuild sharp for macOS runner
-        run: npm rebuild sharp --verbose || true
-
-      - name: Build Plasmo extension for Safari (MV3) with zip
-        run: pnpm build --target=safari-mv3 --zip
-
-      - name: Create safari directory for Xcode project
-        run: mkdir -p safari
-
-      - name: Convert extension to Safari App Extension Xcode project
-        run: |
-          xcrun safari-web-extension-converter ./build/safari-mv3-prod --project-location ./safari --no-open --force
-
-      - name: Show generated Xcode project files
-        run: ls -R safari
-
-      - name: List Xcode schemes
-        run: |
-          xcodebuild -list -project "safari/P-Stream extension/P-Stream extension.xcodeproj"
-
-      - name: Write ExportOptions.plist (base64 decode)
-        run: |
-          mkdir -p build
-          echo "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIGBwbGlzdCBQVUJMSUMgIi0vL0FwcGxlLy9EVEQgcGxpc3QgMS4wLy9FTiIgImh0dHA6Ly93d3cuYXBwbGUuY29tL0RURS9Qcm9wZXJ0eUxpc3QtMS4wLmR0ZCI+CjxwbGlzdCB2ZXJzaW9uPSIxLjAiPgo8ZGljdD4KICA8a2V5Pm1ldGhvZDwva2V5PgogIDxzdHJpbmc+ZGV2ZWxvcG1lbnQ8L3N0cmluZz4KICA8a2V5PnNpZ25pbmdTdHlsZTwva2V5PgogIDxzdHJpbmc+bWFudWFsPC9zdHJpbmc+CiAgPGtleT5jb21waWxlQml0Y29kZTwva2V5PgogIDxmYWxzZS8+CjwvZGljdD4KPC9wbGlzdD4K" | base64 --decode > build/ExportOptions.plist
-
-      - name: Build unsigned .ipa
+      - name: Archive unsigned
         run: |
           cd "safari/P-Stream extension"
           xcodebuild \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
             -scheme "P-Stream extension (iOS)" \
             -destination 'generic/platform=iOS' \
             -configuration Debug \
             -archivePath ../../build/PStreamExtension.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            DEVELOPMENT_TEAM=ABCDE12345 \
             archive
 
-          xcodebuild \
-            -exportArchive \
-            -archivePath ../../build/PStreamExtension.xcarchive \
-            -exportPath ../../build/ipa \
-            -exportOptionsPlist ../../build/ExportOptions.plist || true
+      - name: Create unsigned exportOptions.plist
+        run: |
+          cat > exportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>signingStyle</key>
+            <string>none</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>destination</key>
+            <string>export</string>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export unsigned IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/PStreamExtension.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: safari-extension-unsigned-ipa
+          name: unsigned-ipa
           path: build/ipa/*.ipa
-
-      - name: Upload Plasmo zip artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: plasmo-safari-zip
-          path: build/safari-mv3-prod.zip
